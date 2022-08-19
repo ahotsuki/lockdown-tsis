@@ -1,5 +1,5 @@
 ;globals -----------------------------------------------------------------------------------
-globals [cell-dimension collided pen show-turtles show-links time growth-factor]
+globals [cell-dimension collided pen show-turtles show-links time growth-factor day]
 breed [humans human]
 breed [hfs hf]
 patches-own [ pid ]
@@ -25,6 +25,7 @@ to setup
   set time 0
 
   set cell-dimension ((max-pxcor + 1) / cell)
+  set day (24 * (cell-dimension / 2))
 
   DRAW-CELL-BORDERS
   DRAW-INFECTION
@@ -41,7 +42,7 @@ end
 to go
   clear-output
   tick
-  ask humans [ask my-out-links [die]]
+  
   ask humans [
     set heading (heading + (45 - random 90))
 
@@ -53,6 +54,15 @@ to go
   ]
 
 end
+;-------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 ;population creation ----------------------------------------------------------------------------------------
@@ -166,11 +176,30 @@ end
 to-report DETECT-INFECTION
   if (infection = 0) and (([pcolor] of patch-here) = red)
   [set infection 1]
+  
+  if(infection = 0)
+  [
+    let with-infection-here false
+    ask humans-here 
+    [
+      if (infection > 0)
+      [
+        set with-infection-here true 
+      ]
+    ]
+    if(with-infection-here = true) and (random 100 <= transmission-rate)
+    [
+      set infection 1 
+      if(color != yellow) [ set color blue]
+    ]
+  ]
+    
   if (infection = immunity + 1)
   [
-    if color = green [set color yellow]
+    if color != yellow [set color yellow]
     report false
   ]
+  
   report true
 end
 
@@ -303,6 +332,8 @@ to DRAW-INFECTION
 end
 
 ;-------------------------------------------------------------------------------------------
+
+
 
 
 
