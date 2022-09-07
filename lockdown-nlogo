@@ -3,7 +3,7 @@ globals [cell-dimension collided pen show-turtles show-links time growth-factor 
 breed [humans human]
 breed [hfs hf]
 patches-own [ pid ]
-humans-own [current-cell infection immunity cell-list abnormalFirstDetected TI TN UI speed]
+humans-own [current-cell infection immunity recovery speed]
 ;-------------------------------------------------------------------------------------------
 
 
@@ -42,7 +42,7 @@ end
 to go
   clear-output
   tick
-  
+
   ask humans [
     set heading (heading + (45 - random 90))
 
@@ -50,8 +50,7 @@ to go
     FORWARD-WITHOUT-COLLISION
     HUMAN-HEALTH
 
-    ; increase infection by 1 if infection is greater than 0 and less than a week
-    if (infection > 0) and (infection < (day * 7)) [set infection (infection + 1)]
+
   ]
 
 end
@@ -72,10 +71,9 @@ to POPULATE
   create-humans population [
     set color green
     set infection 0
-    ifelse immune-system > 0
-    [set immunity (((random immune-system) + 1) * cell-dimension)]
-    [set immunity 0]
-    set cell-list []
+    set recovery 0
+    set immunity (random (immune-system + 1))
+    set immunity ((day * 5) + (day * (((10 - immunity) / 10) * 5))) ;set immunity to recovery-limit in ticks (5 days + 5 * immunity% days)
     set speed 1
 
     PREVENT-BLOCK-SPAWN
@@ -119,7 +117,12 @@ to BUILD-HFS
 end
 
 to HUMAN-HEALTH
-  let isNormal DETECT-INFECTION ;check if human isNormal (has no symptoms)
+  ; if not recovered, check human health
+  if(color != grey)
+  [
+    let isNormal DETECT-INFECTION ;check if human isNormal (has no symptoms)
+    let isRecovered DETECT-RECOVERY ;check if human is recovered after being infected
+  ]
 end
 
 to PREVENT-BLOCK-SPAWN
@@ -177,36 +180,64 @@ to-report DETECT-INFECTION
   ; set infection to 1 when stepping on a red patch
   if (infection = 0) and (([pcolor] of patch-here) = red)
   [set infection 1]
-  
+
   ; if not infected
   if(infection = 0)
   [
     ; check if humans nearby (with-infection-here) are infected
     let with-infection-here false
-    ask humans-here 
+    ask humans-here
     [
       if (infection > 0)
       [
         set with-infection-here true
       ]
     ]
-    
+
     ; if humans nearby are infected and randomized number is less than transmission-rate, set this human as infected
     if(with-infection-here = true) and (random 100 <= transmission-rate)
     [
-      set infection 1 
+      set infection 1
       if(color != yellow) [ set color blue]
     ]
   ]
-    
+
   ; if infection value exceeds 7 days (a week) then show symptoms of this human
   if (infection >= (day * 7))
   [
     if color != yellow [set color yellow]
     report false
   ]
-  
+
+  ; increase infection by 1 if infection is greater than 0 and less than a week
+  if (infection > 0) and (infection < (day * 7)) [set infection (infection + 1)]
+
   report true
+end
+
+to-report DETECT-RECOVERY
+  if(color = yellow)
+  [
+    show "yes"
+    show color
+    ; set recovery counter
+    if (recovery = 0) and (color = yellow) [set recovery 1]
+
+    ; increment recovery when less than immunity
+    if(recovery > 0) and (recovery < immunity) [ set recovery (recovery + 1)]
+
+    ; change human status to recovered
+    if(recovery >= immunity)
+    [
+      set color grey
+      show immunity / day
+      report true
+    ]
+  ]
+
+  if(color = grey)[report true]
+
+  report false
 end
 
 to-report CELL-HAS-CHANGED [next]
@@ -386,7 +417,6 @@ to DRAW-CITY
     set row (row + 1)
   ]
 end
-
 
 
 
