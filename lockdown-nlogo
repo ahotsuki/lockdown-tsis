@@ -50,7 +50,8 @@ to go
     FORWARD-WITHOUT-COLLISION
     HUMAN-HEALTH
 
-    if (infection > 0) and (infection <= immunity) [set infection (infection + 1)]
+    ; increase infection by 1 if infection is greater than 0 and less than a week
+    if (infection > 0) and (infection < (day * 7)) [set infection (infection + 1)]
   ]
 
 end
@@ -118,8 +119,7 @@ to BUILD-HFS
 end
 
 to HUMAN-HEALTH
-  let isNormal DETECT-INFECTION
-
+  let isNormal DETECT-INFECTION ;check if human isNormal (has no symptoms)
 end
 
 to PREVENT-BLOCK-SPAWN
@@ -174,19 +174,24 @@ to FORWARD-WITHOUT-COLLISION
 end
 
 to-report DETECT-INFECTION
+  ; set infection to 1 when stepping on a red patch
   if (infection = 0) and (([pcolor] of patch-here) = red)
   [set infection 1]
   
+  ; if not infected
   if(infection = 0)
   [
+    ; check if humans nearby (with-infection-here) are infected
     let with-infection-here false
     ask humans-here 
     [
       if (infection > 0)
       [
-        set with-infection-here true 
+        set with-infection-here true
       ]
     ]
+    
+    ; if humans nearby are infected and randomized number is less than transmission-rate, set this human as infected
     if(with-infection-here = true) and (random 100 <= transmission-rate)
     [
       set infection 1 
@@ -194,7 +199,8 @@ to-report DETECT-INFECTION
     ]
   ]
     
-  if (infection = immunity + 1)
+  ; if infection value exceeds 7 days (a week) then show symptoms of this human
+  if (infection >= (day * 7))
   [
     if color != yellow [set color yellow]
     report false
