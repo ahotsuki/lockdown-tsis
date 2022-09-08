@@ -3,7 +3,7 @@ globals [cell-dimension collided pen show-turtles show-links time growth-factor 
 breed [humans human]
 breed [hfs hf]
 patches-own [ pid ]
-humans-own [current-cell infection immunity recovery speed]
+humans-own [current-cell infection immunity recovery speed locked-down]
 hfs-own [hf-id hf-infected-count]
 ;-------------------------------------------------------------------------------------------
 
@@ -83,11 +83,13 @@ end
 to POPULATE
   create-humans population [
     set color green
+    set speed 1
+
     set infection 0
     set recovery 0
     set immunity (random (immune-system + 1))
     set immunity ((day * 5) + (day * (((10 - immunity) / 10) * 5))) ;set immunity to recovery-limit in ticks (5 days + 5 * immunity% days)
-    set speed 1
+    set locked-down false
 
     PREVENT-BLOCK-SPAWN
 
@@ -176,7 +178,9 @@ to FORWARD-WITHOUT-COLLISION
   let yh ([pycor] of phere)
   let xf ([pxcor] of pfront)
   let yf ([pycor] of pfront)
-  ifelse ([pcolor] of pfront) = black
+
+  ; change heading if facing an obstacle or changing cells when in lockdown
+  ifelse ((([pcolor] of pfront) = black) or (locked-down and ([pid] of phere != [pid] of pfront)))
   [
     ifelse ((xh - xf) != 0) and ((yh - yf) != 0)
     [
@@ -188,6 +192,7 @@ to FORWARD-WITHOUT-COLLISION
       if ((yh - yf) = 0) [ set heading (0 - heading) ]
     ]
   ]
+  ; else if free to move then forward
   [
     forward speed
     set current-cell ([pid] of patch-here)
@@ -329,6 +334,35 @@ end
 
 
 
+; setting/resetting lockdown ------------------------------------------------------------------
+
+to LOCKDOWN-ON-CELL [cellid]
+  ask patches with [pid = cellid]
+  [
+    ask humans-here [
+      set locked-down true
+    ]
+  ]
+
+  DRAW-BORDER-ON-CELL cellid yellow
+end
+
+to RELEASE-LOCKDOWN-ON-CELL [cellid]
+  ask patches with [pid = cellid]
+  [
+    ask humans-here [
+      set locked-down false
+    ]
+  ]
+
+  DRAW-BORDER-ON-CELL cellid black
+end
+
+
+;---------------------------------------------------------------------------------------------
+
+
+
 
 
 
@@ -397,6 +431,36 @@ to DRAW-INFECTION
   ]
 end
 
+to DRAW-BORDER-ON-CELL [cellid bcolor]
+  let xcoor (remainder cellid cell)
+  if(xcoor = 0) [set xcoor cell]
+  let ycoor (ceiling (cellid / cell))
+  set xcoor ((xcoor - 1) * cell-dimension)
+  set ycoor (((cell - ycoor) * cell-dimension))
+  show xcoor
+  show ycoor
+  ask patch xcoor ycoor
+  [
+    sprout 1
+    [
+      set color bcolor
+      set pen-size 5
+      set heading 270
+      forward 0.5
+      set heading 180
+      forward 0.5
+      pen-down
+      let angle -90
+      repeat 4 [
+        set angle (angle + 90)
+        set heading angle
+        forward cell-dimension
+      ]
+      die
+    ]
+  ]
+end
+
 ;-------------------------------------------------------------------------------------------
 
 
@@ -446,16 +510,15 @@ to DRAW-CITY
     set row (row + 1)
   ]
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 350
 10
-856
-517
+789
+450
 -1
 -1
-55.33333333333334
+35.9231
 1
 10
 1
@@ -466,9 +529,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-8
+11
 0
-8
+11
 1
 1
 1
