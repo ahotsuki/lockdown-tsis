@@ -1,9 +1,9 @@
 ;globals -----------------------------------------------------------------------------------
-globals [cell-dimension collided pen show-turtles show-links time growth-factor day]
+globals [cell-dimension collided pen show-turtles show-links time growth-factor day locked-cells]
 breed [humans human]
 breed [hfs hf]
 patches-own [ pid ]
-humans-own [current-cell infection immunity recovery speed locked-down]
+humans-own [current-cell infection immunity recovery speed]
 hfs-own [hf-id hf-infected-count]
 ;-------------------------------------------------------------------------------------------
 
@@ -27,6 +27,7 @@ to setup
 
   set cell-dimension ((max-pxcor + 1) / cell)
   set day (24 * (cell-dimension / 2))
+  set locked-cells []
 
   DRAW-CELL-BORDERS
   DRAW-INFECTION
@@ -89,7 +90,6 @@ to POPULATE
     set recovery 0
     set immunity (random (immune-system + 1))
     set immunity ((day * 5) + (day * (((10 - immunity) / 10) * 5))) ;set immunity to recovery-limit in ticks (5 days + 5 * immunity% days)
-    set locked-down false
 
     PREVENT-BLOCK-SPAWN
 
@@ -179,8 +179,13 @@ to FORWARD-WITHOUT-COLLISION
   let xf ([pxcor] of pfront)
   let yf ([pycor] of pfront)
 
+  ;check if changing cells while inside a locked cell
+  let locked-here ((member? ([pid] of phere) locked-cells) and (([pid] of pfront) != ([pid] of phere)))
+  ;check if changing cells and stepping into a locked cell
+  let locked-ahead ((member? ([pid] of pfront) locked-cells) and (([pid] of pfront) != ([pid] of phere)))
+
   ; change heading if facing an obstacle or changing cells when in lockdown
-  ifelse ((([pcolor] of pfront) = black) or (locked-down and ([pid] of phere != [pid] of pfront)))
+  ifelse ((([pcolor] of pfront) = black) or locked-here or locked-ahead)
   [
     ifelse ((xh - xf) != 0) and ((yh - yf) != 0)
     [
@@ -337,25 +342,19 @@ end
 ; setting/resetting lockdown ------------------------------------------------------------------
 
 to LOCKDOWN-ON-CELL [cellid]
-  ask patches with [pid = cellid]
+  if((member? cellid locked-cells) = false)
   [
-    ask humans-here [
-      set locked-down true
-    ]
+    set locked-cells (fput cellid locked-cells)
+    DRAW-BORDER-ON-CELL cellid yellow
   ]
-
-  DRAW-BORDER-ON-CELL cellid yellow
 end
 
 to RELEASE-LOCKDOWN-ON-CELL [cellid]
-  ask patches with [pid = cellid]
+  if(member? cellid locked-cells)
   [
-    ask humans-here [
-      set locked-down false
-    ]
+    set locked-cells (remove-item (position cellid locked-cells) locked-cells)
+    DRAW-BORDER-ON-CELL cellid black
   ]
-
-  DRAW-BORDER-ON-CELL cellid black
 end
 
 
