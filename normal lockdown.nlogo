@@ -1,5 +1,5 @@
 ;globals -----------------------------------------------------------------------------------
-globals [cell-dimension collided pen show-turtles show-links time growth-factor day locked-cells]
+globals [cell-dimension collided pen show-turtles show-links time growth-factor day week locked-cells]
 breed [humans human]
 breed [hfs hf]
 patches-own [ pid ]
@@ -27,6 +27,7 @@ to setup
 
   set cell-dimension ((max-pxcor + 1) / cell)
   set day (24 * (cell-dimension / 2))
+  set week (7 * day)
   set locked-cells []
 
   DRAW-CELL-BORDERS
@@ -55,7 +56,7 @@ to go
 
       OUT-OF-BORDER
       FORWARD-WITHOUT-COLLISION
-      CELL-HAS-CHANGED lastpatch
+;      CELL-HAS-CHANGED lastpatch
       HUMAN-HEALTH
     ]
   ]
@@ -139,7 +140,7 @@ end
 to HUMAN-HEALTH
   let isNormal DETECT-INFECTION ;check if human isNormal (has no symptoms)
   let isRecovered DETECT-RECOVERY ;check if human is recovered after being infected
-  DETECT-HEALTH-FACILITY self
+  let abnormaFirstDetected (DETECT-HEALTH-FACILITY self)
 end
 
 to PREVENT-BLOCK-SPAWN
@@ -267,26 +268,28 @@ to-report DETECT-RECOVERY
   report false
 end
 
-to DETECT-HEALTH-FACILITY [current-human]
-  ; current-human makes a link to the health facility when stepping at its radius
+to-report DETECT-HEALTH-FACILITY [current-human]
+  ; current-human infected makes a link to the health facility when stepping at its radius
   let hfid ([pid] of patch-here)
-  if(([pcolor] of patch-here) = [145 196 255]) and (([color] of current-human) = yellow)
+  if((([pcolor] of patch-here) = [145 196 255]) and (([color] of current-human) = yellow) and (count my-out-links = 0))
   [
     ask hfs with [hf-id = hfid]
     [
       create-link-from current-human
     ]
   ]
+
+  report false
 end
 
-to CELL-HAS-CHANGED [lastpatch]
-  if current-cell != lastpatch
-  [
-    ask my-out-links [die]
-    ;report true
-  ]
-  ;report false
-end
+;to CELL-HAS-CHANGED [lastpatch]
+;  if current-cell != lastpatch
+;  [
+;    ask my-out-links [die]
+;    report true
+;  ]
+;  report false
+;end
 
 ;-------------------------------------------------------------------------------------------
 
