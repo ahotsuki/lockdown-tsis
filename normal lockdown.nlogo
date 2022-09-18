@@ -1,10 +1,10 @@
 ;globals -----------------------------------------------------------------------------------
-globals [cell-dimension collided pen show-turtles show-links time growth-factor day week locked-cells]
+globals [cell-dimension collided pen show-turtles show-links time growth-factor oneday oneweek locked-cells weekday]
 breed [humans human]
 breed [hfs hf]
 patches-own [ pid ]
 humans-own [current-cell infection immunity recovery speed]
-hfs-own [hf-id hf-infected-count]
+hfs-own [hf-id hf-infected-count last-infected]
 ;-------------------------------------------------------------------------------------------
 
 
@@ -19,6 +19,7 @@ to setup
   ask patches [
     set pcolor white
   ]
+  set weekday 0 ;1->7
   set collided 0
   set pen false
   set show-turtles true
@@ -26,8 +27,8 @@ to setup
   set time 0
 
   set cell-dimension ((max-pxcor + 1) / cell)
-  set day (24 * (cell-dimension / 2))
-  set week (7 * day)
+  set oneday (24 * (cell-dimension / 2))
+  set oneweek (7 * oneday)
   set locked-cells []
 
   DRAW-CELL-BORDERS
@@ -66,8 +67,11 @@ to go
     if any? my-in-links [
       set hf-infected-count (count my-in-links)
     ]
+    show hf-infected-count
+;    show ticks
   ]
 
+  set weekday ((floor (ticks / oneday)) mod 7) + 1
 end
 ;-------------------------------------------------------------------------------------------
 
@@ -90,7 +94,7 @@ to POPULATE
     set infection 0
     set recovery 0
     set immunity (random (immune-system + 1))
-    set immunity ((day * 5) + (day * (((10 - immunity) / 10) * 5))) ;set immunity to recovery-limit in ticks (5 days + 5 * immunity% days)
+    set immunity ((oneday * 5) + (oneday * (((10 - immunity) / 10) * 5))) ;set immunity to recovery-limit in ticks (5 days + 5 * immunity% days)
 
     PREVENT-BLOCK-SPAWN
 
@@ -232,14 +236,14 @@ to-report DETECT-INFECTION
   ]
 
   ; if infection value exceeds 7 days (a week) then show symptoms of this human
-  if (infection >= (day * 7))
+  if (infection >= (oneday * 7))
   [
     if color != yellow [set color yellow]
     report false
   ]
 
   ; increase infection by 1 if infection is greater than 0 and less than a week
-  if (infection > 0) and (infection < (day * 7)) [set infection (infection + 1)]
+  if (infection > 0) and (infection < (oneday * 7)) [set infection (infection + 1)]
 
   report true
 end
@@ -514,13 +518,13 @@ to DRAW-CITY
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-350
-10
-789
-450
+346
+15
+924
+594
 -1
 -1
-35.9231
+63.33333333333334
 1
 10
 1
@@ -531,9 +535,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-11
+8
 0
-11
+8
 1
 1
 1
@@ -595,7 +599,7 @@ INPUTBOX
 250
 70
 population
-1.0
+3.0
 1
 0
 Number
@@ -1144,7 +1148,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.2.1
+NetLogo 6.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
