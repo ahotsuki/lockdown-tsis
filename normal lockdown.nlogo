@@ -163,6 +163,31 @@ end
 
 
 
+
+; population division getters ------------------------------------------------------------------
+
+;report agent-set
+to-report GET-SUSCEPTIBLE
+  report (humans with [color = green])
+end
+
+;report agent-set
+to-report GET-INFECTED
+  report (humans with [color = red])
+end
+
+;report agent-set
+to-report GET-RECOVERED
+  report (humans with [color = grey])
+end
+
+;----------------------------------------------------------------------------------------------
+
+
+
+
+
+
 ;collision detection -------------------------------------------------------------------------------------------
 
 to OUT-OF-BORDER
