@@ -599,7 +599,7 @@ BUTTON
 137
 121
 go
-reset-timer\n;ifelse ticks !=  ((cell-dimension * immune-system) * cell)\n;[\n;go\n;set time (timer + time)\n;]\n;[\n;clear-output\n;output-print \"Simulation done!\"\n;]\ngo\nset time (timer + time)
+reset-timer\n;ifelse ticks !=  ((cell-dimension * immune-system) * cell)\n;[\n;go\n;set time (timer + time)\n;]\n;[\n;clear-output\n;output-print \"Simulation done!\"\n;]\nif ((count humans) != (count humans with [color = grey]))\n[\n go\n set time (timer + time)\n]
 T
 1
 T
