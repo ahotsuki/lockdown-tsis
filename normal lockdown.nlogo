@@ -4,7 +4,7 @@ breed [humans human]
 breed [hfs hf]
 patches-own [ pid ]
 humans-own [current-cell infection immunity recovery speed]
-hfs-own [hf-id hf-infected-count last-infected]
+hfs-own [hf-id hf-infected-count last-week-new-infected new-count-weekly-reset local-growth-factor]
 ;-------------------------------------------------------------------------------------------
 
 
@@ -27,7 +27,7 @@ to setup
   set time 0
 
   set cell-dimension ((max-pxcor + 1) / cell)
-  set oneday (24 * (cell-dimension / 2))
+  set oneday (1 * (cell-dimension / 2))
   set oneweek (7 * oneday)
   set locked-cells []
 
@@ -67,16 +67,45 @@ to go
     if any? my-in-links [
       set hf-infected-count (count my-in-links)
     ]
-;    show weekday
-;    show hf-infected-count
-;    show last-infected
-    if (weekday = 1)
-    [
-      ; put current and last comparison in this block
 
-      set last-infected hf-infected-count
+    ; calculate growth factor by last week new infected/this week new infected
+    ; if last week new infected = 0 then growth factor is 1
+    ifelse (weekday = 1 and new-count-weekly-reset)
+    [
+      ifelse (last-week-new-infected = 0)
+      [
+        ifelse (count my-in-links with [color = red] > 0)
+        [
+          set local-growth-factor 1
+        ][
+          set local-growth-factor 0
+        ]
+      ][
+        set local-growth-factor ((count my-in-links with [color = red]) / last-week-new-infected)
+      ]
+
+      ifelse(local-growth-factor >= 1)
+      [
+        LOCKDOWN-ON-CELL hf-id
+      ][
+        RELEASE-LOCKDOWN-ON-CELL hf-id
+      ]
+
+      set last-week-new-infected (count my-in-links with [color = red])
+      ask links with [color = red] [set color 5]
+      set new-count-weekly-reset false
+    ][
+      ifelse (weekday = 7)[
+        set new-count-weekly-reset true
+      ][
+        set new-count-weekly-reset false
+      ]
     ]
+
+
   ]
+
+  show weekday
 
   set weekday ((floor (ticks / oneday)) mod 7) + 1
 end
@@ -144,6 +173,8 @@ to BUILD-HFS
       set celly (celly + 1)
       set cellx 0
     ]
+
+    set new-count-weekly-reset true
   ]
 
 end
@@ -311,7 +342,7 @@ to-report DETECT-HEALTH-FACILITY [current-human]
   [
     ask hfs with [hf-id = hfid]
     [
-      create-link-from current-human
+      create-link-from current-human [set color red]
     ]
   ]
 
@@ -552,8 +583,8 @@ end
 GRAPHICS-WINDOW
 346
 15
-924
-594
+860
+530
 -1
 -1
 63.33333333333334
@@ -567,9 +598,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-8
+7
 0
-8
+7
 1
 1
 1
@@ -619,7 +650,7 @@ cell
 cell
 1
 10
-3.0
+2.0
 1
 1
 NIL
@@ -631,7 +662,7 @@ INPUTBOX
 250
 70
 population
-3.0
+10.0
 1
 0
 Number
@@ -709,7 +740,7 @@ NIL
 T
 OBSERVER
 NIL
-NIL
+Z
 NIL
 NIL
 1
