@@ -1,10 +1,10 @@
 ;globals -----------------------------------------------------------------------------------
-globals [cell-dimension collided pen show-turtles show-links time growth-factor oneday oneweek locked-cells weekday]
+globals [cell-dimension collided pen show-turtles show-links time growth-factor oneday oneweek locked-cells weekday weekcount last-week-infected new-count-weekly-reset]
 breed [humans human]
 breed [hfs hf]
 patches-own [ pid ]
 humans-own [current-cell infection immunity recovery speed]
-hfs-own [hf-id hf-infected-count last-week-new-infected new-count-weekly-reset local-growth-factor]
+hfs-own [hf-id hf-infected-count last-week-new-infected local-growth-factor]
 ;-------------------------------------------------------------------------------------------
 
 
@@ -19,7 +19,10 @@ to setup
   ask patches [
     set pcolor white
   ]
+  set last-week-infected 0
+  set new-count-weekly-reset true
   set weekday 0 ;1->7
+  set weekcount 0
   set collided 0
   set pen false
   set show-turtles true
@@ -70,44 +73,58 @@ to go
 
     ; calculate growth factor by last week new infected/this week new infected
     ; if last week new infected = 0 then growth factor is 1
-    ifelse (weekday = 1 and new-count-weekly-reset)
+    if (weekday = 1 and new-count-weekly-reset)
     [
-      ifelse (last-week-new-infected = 0)
+      (ifelse (last-week-new-infected = 0)
       [
-        ifelse (count my-in-links with [color = red] > 0)
+        (ifelse (count my-in-links with [color = red] > 0)
         [
           set local-growth-factor 1
         ][
           set local-growth-factor 0
-        ]
+        ])
       ][
         set local-growth-factor ((count my-in-links with [color = red]) / last-week-new-infected)
-      ]
+      ])
 
-      ifelse(local-growth-factor >= 1)
-      [
-        LOCKDOWN-ON-CELL hf-id
-      ][
-        RELEASE-LOCKDOWN-ON-CELL hf-id
-      ]
+;      (ifelse(local-growth-factor >= 0.5)
+;      [
+;        LOCKDOWN-ON-CELL hf-id
+;      ][
+;        RELEASE-LOCKDOWN-ON-CELL hf-id
+;      ])
 
       set last-week-new-infected (count my-in-links with [color = red])
-      ask links with [color = red] [set color 5]
-      set new-count-weekly-reset false
-    ][
-      ifelse (weekday = 7)[
-        set new-count-weekly-reset true
-      ][
-        set new-count-weekly-reset false
-      ]
+      ask my-in-links with [color = red] [set color 5]
     ]
-
-
   ]
 
-  show weekday
+  (ifelse
+    (weekday = 1 and new-count-weekly-reset)
+    [
+      let last-infected 0
+      ask hfs [
+       set last-infected (last-infected + last-week-new-infected)
+      ]
+      (ifelse(last-week-infected = 0)[
+        set growth-factor 1
+      ][
+        set growth-factor (last-infected / last-week-infected)
+        if (growth-factor > 1) [set growth-factor 1]
+      ])
+      set last-week-infected last-infected
+      set new-count-weekly-reset false
+    ](weekday = 7)[
+      set new-count-weekly-reset true
+    ]
+  )
+
+
+
+;  show weekday
 
   set weekday ((floor (ticks / oneday)) mod 7) + 1
+  set weekcount (floor (ticks / oneweek))
 end
 ;-------------------------------------------------------------------------------------------
 
@@ -133,8 +150,9 @@ to POPULATE
     set immunity ((oneday * 5) + (oneday * (((10 - immunity) / 10) * 5))) ;set immunity to recovery-limit in ticks (5 days + 5 * immunity% days)
 
     PREVENT-BLOCK-SPAWN
-
   ]
+
+  ask n-of 10 humans [set infection 1]
 
 end
 
@@ -173,8 +191,6 @@ to BUILD-HFS
       set celly (celly + 1)
       set cellx 0
     ]
-
-    set new-count-weekly-reset true
   ]
 
 end
@@ -415,7 +431,8 @@ to LOCKDOWN-ON-CELL [cellid]
   if((member? cellid locked-cells) = false)
   [
     set locked-cells (fput cellid locked-cells)
-    DRAW-BORDER-ON-CELL cellid yellow
+;    DRAW-BORDER-ON-CELL cellid yellow
+    ask hfs with [hf-id = cellid] [set color yellow]
   ]
 end
 
@@ -423,7 +440,8 @@ to RELEASE-LOCKDOWN-ON-CELL [cellid]
   if(member? cellid locked-cells)
   [
     set locked-cells (remove-item (position cellid locked-cells) locked-cells)
-    DRAW-BORDER-ON-CELL cellid black
+;    DRAW-BORDER-ON-CELL cellid black
+    ask hfs with [hf-id = cellid] [set color blue]
   ]
 end
 
@@ -500,39 +518,35 @@ to DRAW-INFECTION
   ]
 end
 
-to DRAW-BORDER-ON-CELL [cellid bcolor]
-  let xcoor (remainder cellid cell)
-  if(xcoor = 0) [set xcoor cell]
-  let ycoor (ceiling (cellid / cell))
-  set xcoor ((xcoor - 1) * cell-dimension)
-  set ycoor (((cell - ycoor) * cell-dimension))
-  show xcoor
-  show ycoor
-  ask patch xcoor ycoor
-  [
-    sprout 1
-    [
-      set color bcolor
-      set pen-size 5
-      set heading 270
-      forward 0.5
-      set heading 180
-      forward 0.5
-      pen-down
-      let angle -90
-      repeat 4 [
-        set angle (angle + 90)
-        set heading angle
-        forward cell-dimension
-      ]
-      die
-    ]
-  ]
-end
+;to DRAW-BORDER-ON-CELL [cellid bcolor]
+;  let xcoor (remainder cellid cell)
+;  if(xcoor = 0) [set xcoor cell]
+;  let ycoor (ceiling (cellid / cell))
+;  set xcoor ((xcoor - 1) * cell-dimension)
+;  set ycoor (((cell - ycoor) * cell-dimension))
+;  ask patch xcoor ycoor
+;  [
+;    sprout 1
+;    [
+;      set color bcolor
+;      set pen-size 5
+;      set heading 270
+;      forward 0.5
+;      set heading 180
+;      forward 0.5
+;      pen-down
+;      let angle -90
+;      repeat 4 [
+;        set angle (angle + 90)
+;        set heading angle
+;        forward cell-dimension
+;      ]
+;      die
+;    ]
+;  ]
+;end
 
 ;-------------------------------------------------------------------------------------------
-
-
 
 
 
@@ -579,15 +593,35 @@ to DRAW-CITY
     set row (row + 1)
   ]
 end
+;-------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+;plotting ------------------------------------------------------------------------------------------
+to PLOT-GLOBAL-GROWTH-FACTOR
+  plotxy weekcount growth-factor
+end
+
+to PLOT-VS-POPULATION
+  if count humans != 0
+  [
+    plotxy weekcount ((count humans with [color != grey])/(count humans))
+  ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 346
 15
-860
-530
+873
+543
 -1
 -1
-63.33333333333334
+5.19
 1
 10
 1
@@ -598,9 +632,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-7
+99
 0
-7
+99
 1
 1
 1
@@ -650,7 +684,7 @@ cell
 cell
 1
 10
-2.0
+10.0
 1
 1
 NIL
@@ -662,7 +696,7 @@ INPUTBOX
 250
 70
 population
-10.0
+1000.0
 1
 0
 Number
@@ -688,7 +722,7 @@ INPUTBOX
 341
 70
 infection-radius
-1.0
+0.0
 1
 0
 Number
@@ -778,18 +812,19 @@ PLOT
 373
 256
 523
-scores
-cell
-score
-1.0
+global growth factor
+weekcount
+growth-factor
+0.0
 1.0
 0.0
 1.0
 true
 false
-"" "clear-plot"
+"" ""
 PENS
-"default" 1.0 1 -16777216 true "plot-scores" "plot-scores"
+"pen-0" 1.0 0 -16777216 true "PLOT-GLOBAL-GROWTH-FACTOR" "PLOT-GLOBAL-GROWTH-FACTOR"
+"pen-1" 1.0 0 -955883 true "PLOT-VS-POPULATION" "PLOT-VS-POPULATION"
 
 BUTTON
 9
@@ -864,7 +899,7 @@ INPUTBOX
 342
 369
 hfs-radius
-1.5
+2.5
 1
 0
 Number
