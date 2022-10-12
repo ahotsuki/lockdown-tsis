@@ -87,12 +87,12 @@ to go
         set local-growth-factor ((count my-in-links with [color = red]) / last-week-new-infected)
       ])
 
-;      (ifelse(local-growth-factor >= 0.5)
-;      [
-;        LOCKDOWN-ON-CELL hf-id
-;      ][
-;        RELEASE-LOCKDOWN-ON-CELL hf-id
-;      ])
+      (ifelse(local-growth-factor >= 1)
+      [
+        LOCKDOWN-ON-CELL hf-id
+      ][
+        RELEASE-LOCKDOWN-ON-CELL hf-id
+      ])
 
       set last-week-new-infected (count my-in-links with [color = red])
       ask my-in-links with [color = red] [set color 5]
@@ -110,7 +110,7 @@ to go
         set growth-factor 1
       ][
         set growth-factor (last-infected / last-week-infected)
-        if (growth-factor > 1) [set growth-factor 1]
+;        if (growth-factor > 1) [set growth-factor 1]
       ])
       set last-week-infected last-infected
       set new-count-weekly-reset false
@@ -152,7 +152,8 @@ to POPULATE
     PREVENT-BLOCK-SPAWN
   ]
 
-  ask n-of 10 humans [set infection 1]
+;  ask n-of (population * 0.1) humans [set infection 1]
+;  ask humans with [infection > 0] [set color grey]
 
 end
 
@@ -300,7 +301,7 @@ to-report DETECT-INFECTION
     let with-infection-here false
     ask humans-here
     [
-      if (infection > 0)
+      if (infection > 0 and color != grey)
       [
         set with-infection-here true
       ]
@@ -615,13 +616,13 @@ to PLOT-VS-POPULATION
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-346
-15
-873
-543
+347
+12
+875
+541
 -1
 -1
-5.19
+5.2
 1
 10
 1
@@ -664,7 +665,7 @@ BUTTON
 137
 121
 go
-reset-timer\n;ifelse ticks !=  ((cell-dimension * immune-system) * cell)\n;[\n;go\n;set time (timer + time)\n;]\n;[\n;clear-output\n;output-print \"Simulation done!\"\n;]\nif ((count humans) != (count humans with [color = grey]))\n[\n go\n set time (timer + time)\n]
+reset-timer\n\n;if (((count humans with [color = grey])/(count humans)) <= 0.5)\nif (((count humans with [color = grey])/(count humans)) < 1)\n;if ((count humans with [infection > 0 and color != grey]) > 0)\n[\n go\n set time (timer + time)\n]
 T
 1
 T
@@ -696,7 +697,7 @@ INPUTBOX
 250
 70
 population
-1000.0
+500.0
 1
 0
 Number
@@ -722,7 +723,7 @@ INPUTBOX
 341
 70
 infection-radius
-0.0
+5.0
 1
 0
 Number
@@ -899,7 +900,7 @@ INPUTBOX
 342
 369
 hfs-radius
-2.5
+1.0
 1
 0
 Number
