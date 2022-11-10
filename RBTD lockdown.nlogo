@@ -1,10 +1,14 @@
 ;globals -----------------------------------------------------------------------------------
 globals [cell-dimension collided pen show-turtles show-links time growth-factor oneday oneweek locked-cells weekday weekcount last-week-infected new-count-weekly-reset]
 breed [humans human]
+breed [mecagents mecagent]
+breed [supermanagers supermanager]
 breed [hfs hf]
 patches-own [ pid ]
-humans-own [current-cell infection immunity recovery speed]
+humans-own [current-cell infection immunity recovery speed cell-list abnormalFirstDetected TI TN UI]
 hfs-own [hf-id hf-infected-count last-week-new-infected local-growth-factor]
+mecagents-own [current-cell TI TN UI]
+supermanagers-own [current-time TI TN UI SC RANK]
 ;-------------------------------------------------------------------------------------------
 
 
@@ -42,6 +46,9 @@ to setup
 
   ;DRAW-CITY
 
+  SUPERMANAGER-INIT
+  MEC-INIT
+
   POPULATE
 
   output-print "DONE SETTING UP!"
@@ -62,6 +69,7 @@ to go
       FORWARD-WITHOUT-COLLISION
 ;      CELL-HAS-CHANGED lastpatch
       HUMAN-HEALTH
+      PERSONAL-MONITORING-AGENT lastpatch
     ]
   ]
 
@@ -149,12 +157,13 @@ to POPULATE
     set immunity (random (immune-system + 1))
     set immunity ((oneday * 5) + (oneday * (((10 - immunity) / 10) * 5))) ;set immunity to recovery-limit in ticks (5 days + 5 * immunity% days)
 
+    set cell-list []
+    set TI INITIALIZE-LIST cell 0 true
+    set TN INITIALIZE-LIST cell 0 true
+    set UI INITIALIZE-LIST cell 0 true
+
     PREVENT-BLOCK-SPAWN
   ]
-
-;  ask n-of (population * 0.1) humans [set infection 1]
-;  ask humans with [infection > 0] [set color grey]
-
 end
 
 to BUILD-HFS
@@ -162,6 +171,9 @@ to BUILD-HFS
   let celly 0
   let myid 0
   create-hfs (cell * cell) [
+    set label "HF"
+    set label-color 27
+
     let xrandom (random cell-dimension)
     let yrandom (random cell-dimension)
     setxy ((cell-dimension * cellx) + xrandom) ((cell-dimension * celly) + yrandom)
@@ -196,6 +208,60 @@ to BUILD-HFS
 
 end
 
+to MEC-INIT
+  let c-index ((ceiling (cell-dimension / 2)) - 1)
+  let x 0
+  let y 0
+  repeat cell
+  [
+    repeat cell
+    [
+      ask patch ((x * cell-dimension) + c-index) ((y * cell-dimension) + c-index)
+      [
+        sprout-mecagents 1
+        [
+          set label "MEC"
+          set label-color 27
+
+          set shape "house"
+          set size 0.5
+          set color blue
+          set current-cell ([pid] of patch-here)
+        ]
+      ]
+      set x (x + 1)
+    ]
+    set x 0
+    set y (y + 1)
+  ]
+end
+
+to SUPERMANAGER-INIT
+  let center (floor (max-pxcor / 2))
+  let index (floor (cell-dimension / 2))
+  if (cell mod 2) = 0
+  [set index 0]
+  ask patch center center
+  [
+    ask patch-at 0 index
+    [
+      sprout-supermanagers 1
+      [
+        set label "SUPER"
+        set label-color 27
+
+        set shape "star"
+        set color violet
+        if (index = 0) or (cell-dimension mod 2 = 0) [
+          set heading 90
+          forward 0.5
+        ]
+        set current-time ticks
+      ]
+    ]
+  ]
+end
+
 to HUMAN-HEALTH
   let isNormal DETECT-INFECTION ;check if human isNormal (has no symptoms)
   let isRecovered DETECT-RECOVERY ;check if human is recovered after being infected
@@ -210,7 +276,172 @@ to PREVENT-BLOCK-SPAWN
   ]
 end
 
+
 ;-------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+;agent codes -----------------------------------------------------------------------------------
+
+to PERSONAL-MONITORING-AGENT [lastpatch]
+;  output-print (word "pma called at " ticks)
+  let isNormal DETECT-INFECTION ;check if human isNormal (has no symptoms)
+  let isRecovered DETECT-RECOVERY ;check if human is recovered after being infected
+  let abnormaFirstDetected (DETECT-HEALTH-FACILITY self)
+;  let isNormal DETECT-INFECTION
+  let cellHasChanged (CELL-HAS-CHANGED lastpatch)
+
+  ;--------- A ----------
+  if cellHasChanged
+  [
+    set current-cell ([pid] of patch-here)
+    set cell-list ADD-CELL-TO-LIST
+  ]
+
+  ;--------- B ----------
+  if cellHasChanged and isNormal
+  [
+    set TI (replace-item (current-cell - 1) TI 0)
+    set TN (replace-item (current-cell - 1) TN 1)
+    set UI (replace-item (current-cell - 1) UI 0)
+  ]
+
+  ;--------- C ----------
+  if (not isNormal) and (abnormalFirstDetected = 0)
+  [
+    if pen [ask patch-here [set pcolor yellow]]
+    set abnormalFirstDetected ticks
+
+    set TI (replace-item (current-cell - 1) TI 1)
+    set TN (replace-item (current-cell - 1) TN 0)
+    set UI (replace-item (current-cell - 1) UI 0)
+
+    let index 1
+    repeat (cell * cell)
+    [
+      if not (member? index cell-list) [
+        set UI (replace-item (index - 1) UI 1)
+      ]
+      set index (index + 1)
+    ]
+
+    foreach cell-list [ cell-num ->
+      if cell-num != current-cell
+      [
+        set TI (replace-item (cell-num - 1) TI 1)
+        set TN (replace-item (cell-num - 1) TN 0) ;sets TN at Ct by -1 (minus 1)
+      ]
+    ]
+
+    if not cellHasChanged
+    [
+      set TN (replace-item (current-cell - 1) TN 0) ;sets TN at current-cell by -1 (minus 1)
+    ]
+
+  ]
+
+  ;sending value to mec
+  MEC-AGENT current-cell self
+end
+
+to MEC-AGENT [id agent]
+;  output-print (word "mec" id " called")
+  let Mk (mecagents with [current-cell = id])
+  ask Mk [
+    create-link-from agent [
+      if not show-links [hide-link]
+      set color green
+    ]
+  ]
+end
+
+to MEC-RUN
+  let temp-ti INITIALIZE-LIST cell 0 true
+  let temp-tn INITIALIZE-LIST cell 0 true
+  let temp-ui INITIALIZE-LIST cell 0 true
+
+  ;--------- A ---------
+  ask in-link-neighbors
+  [
+    set temp-ti (map + temp-ti TI)
+    set temp-tn (map + temp-tn TN)
+    set temp-ui (map + temp-ui UI)
+  ]
+
+  set TI temp-ti
+  set TN temp-tn
+  set UI temp-ui
+
+  ;--------- B ---------
+  ;sending value to sm
+  SUPERMANAGER-AGENT self
+end
+
+to SUPERMANAGER-AGENT [agent]
+;  show (word "sm called")
+  ask supermanagers [
+    ;resets the list of mecagents that called supermanager at time t
+    if current-time != ticks
+    [
+      ask my-in-links [die]
+      set current-time ticks
+    ]
+
+    ;adds to the list of mecagents at time t
+    create-link-from agent [
+      if not show-links [hide-link]
+      set color green
+    ]
+  ]
+end
+
+to SUPERMANAGER-RUN
+  let temp-ti INITIALIZE-LIST cell 0 true
+  let temp-tn INITIALIZE-LIST cell 0 true
+  let temp-ui INITIALIZE-LIST cell 0 true
+
+  ;---------- A -----------
+  ask in-link-neighbors
+  [
+    set temp-ti (map + temp-ti TI)
+    set temp-tn (map + temp-tn TN)
+    set temp-ui (map + temp-ui UI)
+  ]
+  set TI temp-ti
+  set TN temp-tn
+  set UI temp-ui
+
+  ;---------- B ------------
+  ;computes sc
+  let temp-sc INITIALIZE-LIST cell 0 true
+  let index 0
+  repeat (length temp-sc)
+  [
+    let denom ((item index TI) + (item index TN) + (item index UI))
+    if denom > 0
+    [
+      set temp-sc (replace-item index temp-sc ((item index TI) / denom))
+    ]
+    set index (index + 1)
+  ]
+  set SC temp-sc
+
+  ;RANKS THE SUSPICIOUS CELLS
+  set RANK (RANK-LIST SC)
+end
+
+;-------------------------------------------------------------------------------------------
+
+
+
+
 
 
 
@@ -366,18 +597,16 @@ to-report DETECT-HEALTH-FACILITY [current-human]
   report false
 end
 
-;to CELL-HAS-CHANGED [lastpatch]
-;  if current-cell != lastpatch
-;  [
-;    ask my-out-links [die]
-;    report true
-;  ]
-;  report false
-;end
+to-report CELL-HAS-CHANGED [lastpatch]
+  if current-cell != lastpatch
+  [
+    ask my-out-links [die]
+    report true
+  ]
+  report false
+end
 
 ;-------------------------------------------------------------------------------------------
-
-
 
 
 
@@ -455,6 +684,53 @@ end
 
 
 
+
+
+;utility functions -------------------------------------------------------------------------------
+
+to-report ADD-CELL-TO-LIST
+  let tempList cell-list
+  let entry ([pid] of patch-here)
+  if member? entry tempList [report tempList]
+  set tempList (lput entry tempList)
+  report (sort tempList)
+end
+
+to-report INITIALIZE-LIST [listSize listValue condition]
+  if condition [set listSIze (listSize * listSize)]
+  let tempList []
+  repeat (listSize)
+  [set tempList (lput listValue tempList)]
+  report tempList
+end
+
+to-report RANK-LIST [list-input]
+  let result list-input
+  let ranks (sort-by > (remove-duplicates list-input))
+  let index 0
+  repeat (length list-input)
+  [
+    let list-item (item index list-input)
+    if not (list-item = 0)
+    [
+      let item-rank ((position list-item ranks) + 1)
+      set result (replace-item index result item-rank)
+    ]
+    set index (index + 1)
+  ]
+  report result
+end
+
+;-------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
 ;Drawing borders -----------------------------------------------------------------------------------
 
 to DRAW-BORDERS
@@ -518,34 +794,6 @@ to DRAW-INFECTION
     ]
   ]
 end
-
-;to DRAW-BORDER-ON-CELL [cellid bcolor]
-;  let xcoor (remainder cellid cell)
-;  if(xcoor = 0) [set xcoor cell]
-;  let ycoor (ceiling (cellid / cell))
-;  set xcoor ((xcoor - 1) * cell-dimension)
-;  set ycoor (((cell - ycoor) * cell-dimension))
-;  ask patch xcoor ycoor
-;  [
-;    sprout 1
-;    [
-;      set color bcolor
-;      set pen-size 5
-;      set heading 270
-;      forward 0.5
-;      set heading 180
-;      forward 0.5
-;      pen-down
-;      let angle -90
-;      repeat 4 [
-;        set angle (angle + 90)
-;        set heading angle
-;        forward cell-dimension
-;      ]
-;      die
-;    ]
-;  ]
-;end
 
 ;-------------------------------------------------------------------------------------------
 
@@ -618,11 +866,11 @@ end
 GRAPHICS-WINDOW
 347
 12
-855
-521
+860
+526
 -1
 -1
-55.6
+56.11111111111112
 1
 10
 1
