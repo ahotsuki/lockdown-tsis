@@ -51,7 +51,7 @@ to setup
 
   POPULATE
 
-  output-print "DONE SETTING UP!"
+  show "DONE SETTING UP!"
 end
 
 to go
@@ -67,11 +67,19 @@ to go
 
       OUT-OF-BORDER
       FORWARD-WITHOUT-COLLISION
-;      CELL-HAS-CHANGED lastpatch
-      HUMAN-HEALTH
+;      HUMAN-HEALTH
+      DETECT-HEALTH-FACILITY self
       PERSONAL-MONITORING-AGENT lastpatch
     ]
   ]
+
+  ask mecagents [
+    if any? my-in-links [
+      MEC-RUN
+    ]
+  ]
+
+  ask supermanagers [ SUPERMANAGER-RUN ]
 
   ask hfs [
     set hf-infected-count 0
@@ -265,7 +273,7 @@ end
 to HUMAN-HEALTH
   let isNormal DETECT-INFECTION ;check if human isNormal (has no symptoms)
   let isRecovered DETECT-RECOVERY ;check if human is recovered after being infected
-  let abnormaFirstDetected (DETECT-HEALTH-FACILITY self)
+  DETECT-HEALTH-FACILITY self
 end
 
 to PREVENT-BLOCK-SPAWN
@@ -291,10 +299,9 @@ end
 ;agent codes -----------------------------------------------------------------------------------
 
 to PERSONAL-MONITORING-AGENT [lastpatch]
-;  output-print (word "pma called at " ticks)
   let isNormal DETECT-INFECTION ;check if human isNormal (has no symptoms)
   let isRecovered DETECT-RECOVERY ;check if human is recovered after being infected
-  let abnormaFirstDetected (DETECT-HEALTH-FACILITY self)
+;  let abnormaFirstDetected (DETECT-HEALTH-FACILITY self)
 ;  let isNormal DETECT-INFECTION
   let cellHasChanged (CELL-HAS-CHANGED lastpatch)
 
@@ -352,7 +359,6 @@ to PERSONAL-MONITORING-AGENT [lastpatch]
 end
 
 to MEC-AGENT [id agent]
-;  output-print (word "mec" id " called")
   let Mk (mecagents with [current-cell = id])
   ask Mk [
     create-link-from agent [
@@ -583,24 +589,22 @@ to-report DETECT-RECOVERY
   report false
 end
 
-to-report DETECT-HEALTH-FACILITY [current-human]
+to DETECT-HEALTH-FACILITY [current-human]
   ; current-human infected makes a link to the health facility when stepping at its radius
   let hfid ([pid] of patch-here)
-  if((([pcolor] of patch-here) = [145 196 255]) and (([color] of current-human) = yellow) and (count my-out-links = 0))
+  if((([pcolor] of patch-here) = [145 196 255]) and (([color] of current-human) = yellow) and ((count my-out-links with [color = red] + count my-out-links with [color = grey]) = 0))
   [
     ask hfs with [hf-id = hfid]
     [
       create-link-from current-human [set color red]
     ]
   ]
-
-  report false
 end
 
 to-report CELL-HAS-CHANGED [lastpatch]
   if current-cell != lastpatch
   [
-    ask my-out-links [die]
+    ask my-out-links with [color = green] [die]
     report true
   ]
   report false
@@ -862,6 +866,17 @@ to PLOT-VS-POPULATION
     plotxy weekcount ((count humans with [color != grey])/(count humans))
   ]
 end
+
+to plot-scores
+  clear-plot
+  let index 1
+  ask supermanagers [
+    foreach SC [ val ->
+      plotxy index val
+      set index (index + 1)
+    ]
+  ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 347
@@ -975,13 +990,6 @@ infection-radius
 1
 0
 Number
-
-OUTPUT
-7
-250
-256
-369
-12
 
 MONITOR
 270
@@ -1152,6 +1160,24 @@ hfs-radius
 1
 0
 Number
+
+PLOT
+9
+247
+255
+367
+plotsc
+cell
+score
+1.0
+1.0
+0.0
+1.0
+true
+false
+"" "clear-plot"
+PENS
+"default" 1.0 1 -16777216 true "plot-scores" "plot-scores"
 
 @#$#@#$#@
 ## WHAT IS IT?
