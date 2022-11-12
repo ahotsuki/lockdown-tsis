@@ -5,7 +5,7 @@ breed [mecagents mecagent]
 breed [supermanagers supermanager]
 breed [hfs hf]
 patches-own [ pid ]
-humans-own [current-cell infection immunity recovery speed cell-list abnormalFirstDetected TI TN UI]
+humans-own [current-cell infection immunity recovery speed cell-list cell-list-counter abnormalFirstDetected TI TN UI]
 hfs-own [hf-id hf-infected-count last-week-new-infected local-growth-factor]
 mecagents-own [current-cell TI TN UI]
 supermanagers-own [current-time TI TN UI SC RANK]
@@ -166,11 +166,16 @@ to POPULATE
     set immunity ((oneday * 5) + (oneday * (((10 - immunity) / 10) * 5))) ;set immunity to recovery-limit in ticks (5 days + 5 * immunity% days)
 
     set cell-list []
+    set cell-list-counter []
     set TI INITIALIZE-LIST cell 0 true
     set TN INITIALIZE-LIST cell 0 true
     set UI INITIALIZE-LIST cell 0 true
 
     PREVENT-BLOCK-SPAWN
+
+    set current-cell ([pid] of patch-here)
+    set cell-list (fput current-cell cell-list)
+    set cell-list-counter (fput ticks cell-list-counter)
   ]
 end
 
@@ -308,9 +313,9 @@ to PERSONAL-MONITORING-AGENT [lastpatch]
   ;--------- A ----------
   if cellHasChanged
   [
-    set current-cell ([pid] of patch-here)
-    set cell-list ADD-CELL-TO-LIST
+    ADD-CELL-TO-LIST
   ]
+  if(abnormalFirstDetected = 0) [INCREMENT-CELL-COUNTER]
 
   ;--------- B ----------
   if cellHasChanged and isNormal
@@ -325,6 +330,9 @@ to PERSONAL-MONITORING-AGENT [lastpatch]
   [
     if pen [ask patch-here [set pcolor yellow]]
     set abnormalFirstDetected ticks
+
+    set cell-list (remove-duplicates cell-list)
+    set cell-list (sort cell-list)
 
     set TI (replace-item (current-cell - 1) TI 1)
     set TN (replace-item (current-cell - 1) TN 0)
@@ -692,12 +700,29 @@ end
 
 ;utility functions -------------------------------------------------------------------------------
 
-to-report ADD-CELL-TO-LIST
-  let tempList cell-list
-  let entry ([pid] of patch-here)
-  if member? entry tempList [report tempList]
-  set tempList (lput entry tempList)
-  report (sort tempList)
+to ADD-CELL-TO-LIST
+  set cell-list (fput current-cell cell-list)
+  set cell-list-counter (fput 0 cell-list-counter)
+;  let tempList cell-list
+;  let entry ([pid] of patch-here)
+;  if member? entry tempList [report tempList]
+;  set tempList (lput entry tempList)
+;  report (sort tempList)
+end
+
+to INCREMENT-CELL-COUNTER
+  let iterator (length cell-list-counter)
+  let index 0
+  repeat (iterator)[
+    let x ((item index cell-list-counter) + 1)
+    set cell-list-counter (replace-item index cell-list-counter x)
+    set index (index + 1)
+  ]
+  while [length cell-list-counter > 1 and last cell-list-counter / oneday >= 7]
+  [
+    set cell-list-counter (but-last cell-list-counter)
+    set cell-list (but-last cell-list)
+  ]
 end
 
 to-report INITIALIZE-LIST [listSize listValue condition]
@@ -881,11 +906,11 @@ end
 GRAPHICS-WINDOW
 347
 12
-860
-526
+841
+507
 -1
 -1
-56.11111111111112
+4.86
 1
 10
 1
@@ -896,9 +921,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-8
+99
 0
-8
+99
 1
 1
 1
@@ -948,7 +973,7 @@ cell
 cell
 1
 10
-3.0
+10.0
 1
 1
 NIL
@@ -960,7 +985,7 @@ INPUTBOX
 250
 70
 population
-5.0
+50.0
 1
 0
 Number
@@ -986,7 +1011,7 @@ INPUTBOX
 341
 70
 infection-radius
-1.0
+5.0
 1
 0
 Number
@@ -1156,7 +1181,7 @@ INPUTBOX
 342
 369
 hfs-radius
-1.0
+2.5
 1
 0
 Number
