@@ -6,7 +6,7 @@ breed [supermanagers supermanager]
 breed [hfs hf]
 patches-own [ pid ]
 humans-own [current-cell infection immunity recovery speed cell-list cell-list-counter abnormalFirstDetected TI TN UI]
-hfs-own [hf-id hf-infected-count last-week-new-infected local-growth-factor]
+hfs-own [hf-id hf-infected-count last-week-new-infected local-growth-factor flagged]
 mecagents-own [current-cell TI TN UI]
 supermanagers-own [current-time TI TN UI SC RANK]
 ;-------------------------------------------------------------------------------------------
@@ -17,6 +17,7 @@ supermanagers-own [current-time TI TN UI SC RANK]
 ;basic setup and simulation loop ------------------------------------------------------------
 
 to setup
+  show "SETUP START..."
   ;reset everything
   clear-all
   reset-ticks
@@ -103,11 +104,12 @@ to go
         set local-growth-factor ((count my-in-links with [color = red]) / last-week-new-infected)
       ])
 
-      (ifelse(local-growth-factor >= 1)
+      (ifelse(local-growth-factor >= 1 or flagged)
       [
         LOCKDOWN-ON-CELL hf-id
       ][
-        RELEASE-LOCKDOWN-ON-CELL hf-id
+        if(not flagged)
+        [RELEASE-LOCKDOWN-ON-CELL hf-id]
       ])
 
       set last-week-new-infected (count my-in-links with [color = red])
@@ -115,6 +117,7 @@ to go
     ]
   ]
 
+  ; calculate global growth factor
   (ifelse
     (weekday = 1 and new-count-weekly-reset)
     [
@@ -126,7 +129,6 @@ to go
         set growth-factor 1
       ][
         set growth-factor (last-infected / last-week-infected)
-;        if (growth-factor > 1) [set growth-factor 1]
       ])
       set last-week-infected last-infected
       set new-count-weekly-reset false
@@ -134,6 +136,71 @@ to go
       set new-count-weekly-reset true
     ]
   )
+
+  ; flag top cells for extended lockdown
+  if weekday = 7
+  [
+    ask hfs with [flagged = true] [set flagged false]
+    ask supermanagers [
+      ; find top 4 cells
+      let toplist []
+      let index 1
+      repeat 4 [
+        if (position index rank != false)
+        [ set toplist (lput ((position index rank) + 1) toplist) ]
+        set index (index + 1)
+      ]
+
+      if length toplist > 0
+      [
+        show "------------"
+        show toplist
+
+        ; flag toplist cells
+        let flaglist []
+        set flaglist (lput (first toplist) flaglist)
+        set toplist (but-first toplist)
+
+        set index 0
+        while [index < length flaglist and length toplist > 0]
+        [
+          let x (item index flaglist)
+
+          ; find if adjacent cells are in toplist and put them to toplist
+          if position (x - 1) toplist != false
+          [
+            set flaglist (lput (x - 1) flaglist)
+            set toplist (remove-item (position (x - 1) toplist) toplist)
+          ]
+          if position (x + 1) toplist != false
+          [
+            set flaglist (lput (x + 1) flaglist)
+            set toplist (remove-item (position (x + 1) toplist) toplist)
+          ]
+          if position (x - cell) toplist != false
+          [
+            set flaglist (lput (x - cell) flaglist)
+            set toplist (remove-item (position (x - cell) toplist) toplist)
+          ]
+          if position (x + cell) toplist != false
+          [
+            set flaglist (lput (x + cell) flaglist)
+            set toplist (remove-item (position (x + cell) toplist) toplist)
+          ]
+
+          set index (index + 1)
+        ]
+
+        show toplist
+        show flaglist
+        show "------------"
+
+        foreach flaglist [x ->
+          ask hfs with [hf-id = x] [set flagged true]
+        ]
+      ]
+    ]
+  ]
 
 
 
@@ -186,6 +253,8 @@ to BUILD-HFS
   create-hfs (cell * cell) [
     set label "HF"
     set label-color 27
+
+    set flagged false
 
     let xrandom (random cell-dimension)
     let yrandom (random cell-dimension)
@@ -933,10 +1002,10 @@ ticks
 BUTTON
 8
 87
-63
+71
 120
 NIL
-setup\n
+setup
 NIL
 1
 T
@@ -985,7 +1054,7 @@ INPUTBOX
 250
 70
 population
-50.0
+100.0
 1
 0
 Number
