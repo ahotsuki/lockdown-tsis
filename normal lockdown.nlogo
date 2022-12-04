@@ -1,5 +1,5 @@
 ;globals -----------------------------------------------------------------------------------
-globals [cell-dimension collided pen show-turtles show-links time growth-factor oneday oneweek locked-cells weekday weekcount last-week-infected new-count-weekly-reset]
+globals [cell-dimension collided pen show-turtles show-links time growth-factor oneday oneweek locked-cells weekday weekcount last-week-infected new-count-weekly-reset with-lockdown]
 breed [humans human]
 breed [hfs hf]
 patches-own [ pid ]
@@ -25,6 +25,7 @@ to setup
   set weekcount 0
   set collided 0
   set pen false
+  set with-lockdown false
   set show-turtles true
   set show-links false
   set time 0
@@ -39,8 +40,6 @@ to setup
 
   SET-CELLS-ID
   BUILD-HFS
-
-  ;DRAW-CITY
 
   POPULATE
 
@@ -87,12 +86,14 @@ to go
         set local-growth-factor ((count my-in-links with [color = red]) / last-week-new-infected)
       ])
 
-      (ifelse(local-growth-factor >= 1)
-      [
-        LOCKDOWN-ON-CELL hf-id
-      ][
-        RELEASE-LOCKDOWN-ON-CELL hf-id
-      ])
+      if(with-lockdown)[
+        (ifelse(local-growth-factor >= 1)
+          [
+            LOCKDOWN-ON-CELL hf-id
+          ][
+            RELEASE-LOCKDOWN-ON-CELL hf-id
+        ])
+      ]
 
       set last-week-new-infected (count my-in-links with [color = red])
       ask my-in-links with [color = red] [set color 5]
@@ -223,12 +224,12 @@ end
 
 ;report agent-set
 to-report GET-SUSCEPTIBLE
-  report (humans with [color = green])
+  report (humans with [infection = 0])
 end
 
 ;report agent-set
 to-report GET-INFECTED
-  report (humans with [color = red])
+  report (humans with [infection > 0 and color != grey])
 end
 
 ;report agent-set
@@ -510,7 +511,7 @@ to DRAW-INFECTION
   if infection-radius > 0
   [
     let origin (max-pxcor / 2)
-    ask patch 39 760 [
+    ask patch origin origin [
       sprout 1 [
         ask patches in-radius infection-radius [set pcolor red]
         die
@@ -614,15 +615,36 @@ to PLOT-VS-POPULATION
     plotxy weekcount ((count humans with [color != grey])/(count humans))
   ]
 end
+
+to PLOT-S-HUMANS
+  if count humans != 0
+  [
+    plotxy ticks (count GET-SUSCEPTIBLE / (count humans))
+  ]
+end
+
+to PLOT-I-HUMANS
+  if count humans != 0
+  [
+    plotxy ticks (count GET-INFECTED / (count humans))
+  ]
+end
+
+to PLOT-R-HUMANS
+  if count humans != 0
+  [
+    plotxy ticks (count humans with [color = grey] / count humans)
+  ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 347
-12
-855
-521
+65
+1355
+1074
 -1
 -1
-55.6
+1.0
 1
 10
 1
@@ -633,9 +655,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-8
+999
 0
-8
+999
 1
 1
 1
@@ -665,7 +687,7 @@ BUTTON
 137
 121
 go
-reset-timer\n\n;if (((count humans with [color = grey])/(count humans)) <= 0.5)\n;if (((count humans with [color = grey])/(count humans)) < 1)\nif ((count humans with [infection > 0 and color != grey]) > 0) or ((count humans with [color = grey]) = 0)\n[\n go\n set time (timer + time)\n]
+reset-timer\n\n;if (((count humans with [color = grey])/(count humans)) <= 0.5)\n;if (((count humans with [color = grey])/(count humans)) < 1)\n;if ((count humans with [infection > 0 and color != grey]) > 0) or ((count humans with [color = grey]) = 0)\n;[\n; go\n; set time (timer + time)\n;]\n\nif (count GET-RECOVERED / count humans) < 0.8\n[\n go\n set time (timer + time)\n]
 T
 1
 T
@@ -685,7 +707,7 @@ cell
 cell
 1
 10
-3.0
+10.0
 1
 1
 NIL
@@ -697,7 +719,7 @@ INPUTBOX
 250
 70
 population
-5.0
+3000.0
 1
 0
 Number
@@ -711,7 +733,7 @@ immune-system
 immune-system
 0
 10
-0.0
+10.0
 1
 1
 NIL
@@ -723,7 +745,7 @@ INPUTBOX
 341
 70
 infection-radius
-1.0
+50.0
 1
 0
 Number
@@ -900,10 +922,80 @@ INPUTBOX
 342
 369
 hfs-radius
-1.0
+25.0
 1
 0
 Number
+
+PLOT
+8
+533
+255
+712
+sir
+NIL
+NIL
+0.0
+1.0
+0.0
+1.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -13840069 true "" "PLOT-S-HUMANS"
+"pen-1" 1.0 0 -7500403 true "" "PLOT-R-HUMANS"
+"pen-2" 1.0 0 -2674135 true "" "PLOT-I-HUMANS"
+
+MONITOR
+267
+376
+340
+421
+NIL
+weekcount
+17
+1
+11
+
+BUTTON
+9
+214
+91
+247
+lockdown
+set with-lockdown not with-lockdown
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+MONITOR
+78
+204
+170
+249
+NIL
+with-lockdown
+17
+1
+11
+
+MONITOR
+347
+10
+1328
+55
+NIL
+locked-cells
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
