@@ -25,7 +25,7 @@ to setup
   set weekcount 0
   set collided 0
   set pen false
-  set with-lockdown false
+  set with-lockdown true
   set show-turtles true
   set show-links false
   set time 0
@@ -633,7 +633,7 @@ end
 to PLOT-R-HUMANS
   if count humans != 0
   [
-    plotxy ticks (count humans with [color = grey] / count humans)
+    plotxy ticks (count GET-RECOVERED / count humans)
   ]
 end
 @#$#@#$#@
@@ -687,7 +687,7 @@ BUTTON
 137
 121
 go
-reset-timer\n\n;if (((count humans with [color = grey])/(count humans)) <= 0.5)\n;if (((count humans with [color = grey])/(count humans)) < 1)\n;if ((count humans with [infection > 0 and color != grey]) > 0) or ((count humans with [color = grey]) = 0)\n;[\n; go\n; set time (timer + time)\n;]\n\nif (count GET-RECOVERED / count humans) < 0.8\n[\n go\n set time (timer + time)\n]
+reset-timer\n\n;if (((count humans with [color = grey])/(count humans)) <= 0.5)\n;if (((count humans with [color = grey])/(count humans)) < 1)\n;if ((count humans with [infection > 0 and color != grey]) > 0) or ((count humans with [color = grey]) = 0)\n;[\n; go\n; set time (timer + time)\n;]\n\nif (count GET-RECOVERED / count humans) < 0.5\n[\n go\n set time (timer + time)\n]
 T
 1
 T
@@ -719,7 +719,7 @@ INPUTBOX
 250
 70
 population
-3000.0
+1000.0
 1
 0
 Number
@@ -847,7 +847,6 @@ false
 "" ""
 PENS
 "pen-0" 1.0 0 -16777216 true "PLOT-GLOBAL-GROWTH-FACTOR" "PLOT-GLOBAL-GROWTH-FACTOR"
-"pen-1" 1.0 0 -955883 true "PLOT-VS-POPULATION" "PLOT-VS-POPULATION"
 
 BUTTON
 9

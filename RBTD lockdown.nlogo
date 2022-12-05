@@ -1,5 +1,5 @@
 ;globals -----------------------------------------------------------------------------------
-globals [cell-dimension collided pen show-turtles show-links time growth-factor oneday oneweek locked-cells weekday weekcount last-week-infected new-count-weekly-reset]
+globals [cell-dimension collided pen show-turtles show-links time growth-factor oneday oneweek locked-cells weekday weekcount last-week-infected new-count-weekly-reset activity]
 breed [humans human]
 breed [mecagents mecagent]
 breed [supermanagers supermanager]
@@ -33,6 +33,7 @@ to setup
   set show-turtles true
   set show-links false
   set time 0
+  set activity 0
 
   set cell-dimension ((max-pxcor + 1) / cell)
   set oneday (2 * (cell-dimension / 2))
@@ -88,7 +89,7 @@ to go
       set hf-infected-count (count my-in-links)
     ]
 
-    ; calculate growth factor by last week new infected/this week new infected
+    ; calculate growth factor by this week new infected/last week new infected
     ; if last week new infected = 0 then growth factor is 1
     if (weekday = 1 and new-count-weekly-reset)
     [
@@ -126,12 +127,23 @@ to go
        set last-infected (last-infected + last-week-new-infected)
       ]
       (ifelse(last-week-infected = 0)[
-        set growth-factor 1
+        (ifelse last-infected = 0 [
+          set growth-factor 0
+        ][
+          set growth-factor 1
+        ])
       ][
         set growth-factor (last-infected / last-week-infected)
       ])
       set last-week-infected last-infected
       set new-count-weekly-reset false
+
+      ; check activity of infection. stops simulation if >4weeks of no infection
+      (ifelse growth-factor = 0 [
+        set activity (activity + 1)
+      ][
+        set activity 0
+      ])
     ](weekday = 7)[
       set new-count-weekly-reset true
     ]
@@ -537,12 +549,12 @@ end
 
 ;report agent-set
 to-report GET-SUSCEPTIBLE
-  report (humans with [color = green])
+  report (humans with [infection = 0])
 end
 
 ;report agent-set
 to-report GET-INFECTED
-  report (humans with [color = red])
+  report (humans with [infection > 0 and color != grey])
 end
 
 ;report agent-set
@@ -884,7 +896,7 @@ to DRAW-INFECTION
   if infection-radius > 0
   [
     let origin (max-pxcor / 2)
-    ask patch 39 760 [
+    ask patch origin origin [
       sprout 1 [
         ask patches in-radius infection-radius [set pcolor red]
         die
@@ -971,15 +983,36 @@ to plot-scores
     ]
   ]
 end
+
+to PLOT-S-HUMANS
+  if count humans != 0
+  [
+    plotxy ticks (count GET-SUSCEPTIBLE / (count humans))
+  ]
+end
+
+to PLOT-I-HUMANS
+  if count humans != 0
+  [
+    plotxy ticks (count GET-INFECTED / (count humans))
+  ]
+end
+
+to PLOT-R-HUMANS
+  if count humans != 0
+  [
+    plotxy ticks (count GET-RECOVERED / count humans)
+  ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-347
-12
-841
-507
+348
+68
+1356
+1077
 -1
 -1
-4.86
+1.0
 1
 10
 1
@@ -990,9 +1023,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-99
+999
 0
-99
+999
 1
 1
 1
@@ -1022,7 +1055,7 @@ BUTTON
 137
 121
 go
-reset-timer\n\n;if (((count humans with [color = grey])/(count humans)) <= 0.5)\n;if (((count humans with [color = grey])/(count humans)) < 1)\nif ((count humans with [infection > 0 and color != grey]) > 0) or ((count humans with [color = grey]) = 0)\n[\n go\n set time (timer + time)\n]
+reset-timer\n\n;if (((count humans with [color = grey])/(count humans)) <= 0.5)\n;if (((count humans with [color = grey])/(count humans)) < 1)\nif (count GET-RECOVERED / count humans) < 0.5 and activity < 4\n[\n go\n set time (timer + time)\n]
 T
 1
 T
@@ -1054,7 +1087,7 @@ INPUTBOX
 250
 70
 population
-100.0
+3000.0
 1
 0
 Number
@@ -1068,7 +1101,7 @@ immune-system
 immune-system
 0
 10
-0.0
+10.0
 1
 1
 NIL
@@ -1080,7 +1113,7 @@ INPUTBOX
 341
 70
 infection-radius
-5.0
+50.0
 1
 0
 Number
@@ -1175,7 +1208,6 @@ false
 "" ""
 PENS
 "pen-0" 1.0 0 -16777216 true "PLOT-GLOBAL-GROWTH-FACTOR" "PLOT-GLOBAL-GROWTH-FACTOR"
-"pen-1" 1.0 0 -955883 true "PLOT-VS-POPULATION" "PLOT-VS-POPULATION"
 
 BUTTON
 9
@@ -1250,7 +1282,7 @@ INPUTBOX
 342
 369
 hfs-radius
-2.5
+25.0
 1
 0
 Number
@@ -1272,6 +1304,48 @@ false
 "" "clear-plot"
 PENS
 "default" 1.0 1 -16777216 true "plot-scores" "plot-scores"
+
+PLOT
+8
+532
+256
+723
+sir
+NIL
+NIL
+0.0
+1.0
+0.0
+1.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -13840069 true "" "PLOT-S-HUMANS"
+"pen-1" 1.0 0 -2674135 true "" "PLOT-I-HUMANS"
+"pen-2" 1.0 0 -7500403 true "" "PLOT-R-HUMANS"
+
+MONITOR
+266
+378
+339
+423
+NIL
+weekcount
+17
+1
+11
+
+MONITOR
+348
+11
+581
+56
+NIL
+locked-cells
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
