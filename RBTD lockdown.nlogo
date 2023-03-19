@@ -1,5 +1,5 @@
 ;globals -----------------------------------------------------------------------------------
-globals [cell-dimension collided pen show-turtles show-links time growth-factor oneday oneweek locked-cells weekday weekcount last-week-infected new-count-weekly-reset activity]
+globals [cell-dimension collided pen show-turtles show-links time growth-factor oneday oneweek locked-cells weekday weekcount last-week-infected activity]
 breed [humans human]
 breed [mecagents mecagent]
 breed [supermanagers supermanager]
@@ -25,7 +25,6 @@ to setup
     set pcolor white
   ]
   set last-week-infected 0
-  set new-count-weekly-reset true
   set weekday 0 ;1->7
   set weekcount 0
   set collided 0
@@ -59,6 +58,9 @@ end
 to go
   clear-output
   tick
+  set weekday ((floor (ticks / oneday)) mod 7) + 1
+  set weekcount (floor (ticks / oneweek))
+
 
   ask humans [
     if(color != grey)
@@ -69,7 +71,6 @@ to go
 
       OUT-OF-BORDER
       FORWARD-WITHOUT-COLLISION
-;      HUMAN-HEALTH
       DETECT-HEALTH-FACILITY self
       PERSONAL-MONITORING-AGENT lastpatch
     ]
@@ -83,163 +84,97 @@ to go
 
   ask supermanagers [ SUPERMANAGER-RUN ]
 
-  ask hfs [
-    set hf-infected-count 0
-    if any? my-in-links [
-      set hf-infected-count (count my-in-links)
-    ]
-
-    ; calculate growth factor by this week new infected/last week new infected
-    ; if last week new infected = 0 then growth factor is 1
-    if (weekday = 1 and new-count-weekly-reset)
-    [
-      (ifelse (last-week-new-infected = 0)
-      [
-        (ifelse (count my-in-links with [color = red] > 0)
-        [
-          set local-growth-factor 1
-        ][
-          set local-growth-factor 0
-        ])
-      ][
-        set local-growth-factor ((count my-in-links with [color = red]) / last-week-new-infected)
-      ])
-
-      (ifelse(local-growth-factor >= 1 or flagged)
-      [
-        LOCKDOWN-ON-CELL hf-id
-      ][
-        if(not flagged)
-        [RELEASE-LOCKDOWN-ON-CELL hf-id]
-      ])
-
-      set last-week-new-infected (count my-in-links with [color = red])
-      ask my-in-links with [color = red] [set color 5]
-    ]
-  ]
-
-  ; calculate global growth factor
-  (ifelse
-    (weekday = 1 and new-count-weekly-reset)
-    [
-      let last-infected 0
-      ask hfs [
-       set last-infected (last-infected + last-week-new-infected)
-      ]
-      (ifelse(last-week-infected = 0)[
-        (ifelse last-infected = 0 [
-          set growth-factor 0
-        ][
-          set growth-factor 1
-        ])
-      ][
-        set growth-factor (last-infected / last-week-infected)
-      ])
-      set last-week-infected last-infected
-      set new-count-weekly-reset false
-
-      ; check activity of infection. stops simulation if >4weeks of no infection
-      (ifelse growth-factor = 0 [
-        set activity (activity + 1)
-      ][
-        set activity 0
-      ])
-    ](weekday = 7)[
-      set new-count-weekly-reset true
-    ]
-  )
-
-  ; flag top cells for extended lockdown
-  if weekday = 7
+  ; run codes at the end of weekday 7 --------------------------------------------------------------------------------------------
+  if ((weekday = 7) and (((((ticks + 1) / oneday)) mod 7) = 0))
   [
+    ; flag top cells for extended lockdown
     ask hfs with [flagged = true] [set flagged false]
     ask supermanagers [
       ; find top 4 cells
-      let toplist []
-      let index 1
-      repeat 4 [
-        if (position index rank != false)
-        [ set toplist (lput ((position index rank) + 1) toplist) ]
-        set index (index + 1)
-      ]
+      let toplist (GET-TOP-CELL 4 rank)
 
+      ; algo for flagging cells for lockdown
       if length toplist > 0
       [
-        show "------------"
-        show toplist
-
-        ; flag toplist cells
-        let flaglist []
-        set flaglist (lput (first toplist) flaglist)
-        set toplist (but-first toplist)
-
-        set index 0
-        while [index < length flaglist and length toplist > 0]
-        [
-          let x (item index flaglist)
-
-          ; find if adjacent cells are in toplist and put them to toplist
-          if position (x - 1) toplist != false and x mod cell != 1                       ; if a cell at the left is in toplist
-          [
-            set flaglist (lput (x - 1) flaglist)
-            set toplist (remove-item (position (x - 1) toplist) toplist)
-          ]
-          if position (x + 1) toplist != false and x mod cell != 0                       ; if a cell at the right is in toplist
-          [
-            set flaglist (lput (x + 1) flaglist)
-            set toplist (remove-item (position (x + 1) toplist) toplist)
-          ]
-          if position (x - cell) toplist != false                                        ; if a cell above is in toplist
-          [
-            set flaglist (lput (x - cell) flaglist)
-            set toplist (remove-item (position (x - cell) toplist) toplist)
-          ]
-          if position (x - cell - 1) toplist != false and (x - cell) mod cell != 1       ; if a cell top-left is in toplist
-          [
-            set flaglist (lput (x - cell - 1) flaglist)
-            set toplist (remove-item (position (x - cell - 1) toplist) toplist)
-          ]
-          if position (x - cell + 1) toplist != false and (x - cell) mod cell != 0       ; if a cell top-right is in toplist
-          [
-            set flaglist (lput (x - cell + 1) flaglist)
-            set toplist (remove-item (position (x - cell + 1) toplist) toplist)
-          ]
-          if position (x + cell) toplist != false                                        ; if a cell below is in toplist
-          [
-            set flaglist (lput (x + cell) flaglist)
-            set toplist (remove-item (position (x + cell) toplist) toplist)
-          ]
-          if position (x + cell - 1) toplist != false and (x + cell) mod cell != 1       ; if a cell bottom-left is in toplist
-          [
-            set flaglist (lput (x + cell - 1) flaglist)
-            set toplist (remove-item (position (x + cell - 1) toplist) toplist)
-          ]
-          if position (x + cell + 1) toplist != false and (x + cell) mod cell != 0       ; if a cell bottom-right is in toplist
-          [
-            set flaglist (lput (x + cell + 1) flaglist)
-            set toplist (remove-item (position (x + cell + 1) toplist) toplist)
-          ]
-
-          set index (index + 1)
-        ]
-
-        show toplist
-        show flaglist
-        show "------------"
+        let flaglist FLAGGED-TOP-CELL toplist
 
         foreach flaglist [x ->
           ask hfs with [hf-id = x] [set flagged true]
         ]
       ]
     ]
+
+
+
+    ; run hfs to calculate local growth factor and lockdown cells
+    ask hfs [
+      set hf-infected-count 0
+      if any? my-in-links [
+        set hf-infected-count (count my-in-links)
+      ]
+
+      ; calculate growth factor by this week new infected/last week new infected
+      ; if last week new infected = 0 then growth factor is 1
+      (ifelse (last-week-new-infected = 0)
+        [
+          (ifelse (count my-in-links with [color = red] > 0)
+            [
+              set local-growth-factor 1
+            ][
+              set local-growth-factor 0
+          ])
+        ][
+          set local-growth-factor ((count my-in-links with [color = red]) / last-week-new-infected)
+        ]
+      )
+
+      ; lockdown cells with growth factor > 1 and flagged cells
+      ; release lockdown on unflagged cells
+      (ifelse(local-growth-factor >= 1 or flagged)
+        [
+          LOCKDOWN-ON-CELL hf-id
+        ][
+          if(not flagged)
+          [RELEASE-LOCKDOWN-ON-CELL hf-id]
+        ]
+      )
+
+      set last-week-new-infected (count my-in-links with [color = red])
+      ask my-in-links with [color = red] [set color 5]
+    ]
+
+
+
+    ; calculate global growth factor
+    let last-infected 0
+    ask hfs [
+      set last-infected (last-infected + last-week-new-infected)
+    ]
+    (ifelse(last-week-infected = 0)[
+      (ifelse last-infected = 0 [
+        set growth-factor 0
+      ][
+        set growth-factor 1
+      ])
+    ][
+      set growth-factor (last-infected / last-week-infected)
+    ])
+    set last-week-infected last-infected
+
+    ; check activity of infection. stops simulation if >4weeks of no infection (check at go button code)
+    (ifelse growth-factor = 0 [
+      set activity (activity + 1)
+    ][
+      set activity 0
+    ])
+
+;    show "execute"
   ]
+  ; end run codes at the end of weekday 7 ----------------------------------------------------------------------------------------
 
 
 
 ;  show weekday
-
-  set weekday ((floor (ticks / oneday)) mod 7) + 1
-  set weekcount (floor (ticks / oneweek))
 end
 ;-------------------------------------------------------------------------------------------
 
@@ -247,6 +182,95 @@ end
 
 
 
+; if topnum=4, get top 4 list
+; if 4 cells have same ranking number 1, then return these cells
+to-report GET-TOP-CELL [topnum ranking]
+  let toplist []
+  let temprank ranking
+  let rankcount 1
+  let index 0
+
+  repeat topnum [
+    set index (position rankcount temprank)
+    if (index != false) [
+      set toplist (lput (index + 1) toplist)
+      set temprank (replace-item index temprank 0)
+    ]
+    if ((position rankcount temprank) = false) [
+      set rankcount (rankcount + 1)
+    ]
+  ]
+
+  report toplist
+end
+
+
+
+to-report FLAGGED-TOP-CELL [toplist]
+;  show "------------"
+;  show toplist
+
+  ; flag toplist cells
+  let flaglist []
+  set flaglist (lput (first toplist) flaglist)
+  set toplist (but-first toplist)
+
+  let index 0
+  while [index < length flaglist and length toplist > 0]
+  [
+    let x (item index flaglist)
+
+    ; find if adjacent cells are in toplist and put them to toplist
+    if position (x - 1) toplist != false and x mod cell != 1                       ; if a cell at the left is in toplist
+    [
+      set flaglist (lput (x - 1) flaglist)
+      set toplist (remove-item (position (x - 1) toplist) toplist)
+    ]
+    if position (x + 1) toplist != false and x mod cell != 0                       ; if a cell at the right is in toplist
+    [
+      set flaglist (lput (x + 1) flaglist)
+      set toplist (remove-item (position (x + 1) toplist) toplist)
+    ]
+    if position (x - cell) toplist != false                                        ; if a cell above is in toplist
+    [
+      set flaglist (lput (x - cell) flaglist)
+      set toplist (remove-item (position (x - cell) toplist) toplist)
+    ]
+    if position (x - cell - 1) toplist != false and (x - cell) mod cell != 1       ; if a cell top-left is in toplist
+    [
+      set flaglist (lput (x - cell - 1) flaglist)
+      set toplist (remove-item (position (x - cell - 1) toplist) toplist)
+    ]
+    if position (x - cell + 1) toplist != false and (x - cell) mod cell != 0       ; if a cell top-right is in toplist
+    [
+      set flaglist (lput (x - cell + 1) flaglist)
+      set toplist (remove-item (position (x - cell + 1) toplist) toplist)
+    ]
+    if position (x + cell) toplist != false                                        ; if a cell below is in toplist
+    [
+      set flaglist (lput (x + cell) flaglist)
+      set toplist (remove-item (position (x + cell) toplist) toplist)
+    ]
+    if position (x + cell - 1) toplist != false and (x + cell) mod cell != 1       ; if a cell bottom-left is in toplist
+    [
+      set flaglist (lput (x + cell - 1) flaglist)
+      set toplist (remove-item (position (x + cell - 1) toplist) toplist)
+    ]
+    if position (x + cell + 1) toplist != false and (x + cell) mod cell != 0       ; if a cell bottom-right is in toplist
+    [
+      set flaglist (lput (x + cell + 1) flaglist)
+      set toplist (remove-item (position (x + cell + 1) toplist) toplist)
+    ]
+
+    set index (index + 1)
+  ]
+
+;  show toplist
+;  show flaglist
+;  show "------------"
+
+  report flaglist
+end
 
 
 
@@ -701,7 +725,7 @@ end
 to DETECT-HEALTH-FACILITY [current-human]
   ; current-human infected makes a link to the health facility when stepping at its radius
   let hfid ([pid] of patch-here)
-  if((([pcolor] of patch-here) = [145 196 255]) and (([color] of current-human) = yellow) and ((count my-out-links with [color = red] + count my-out-links with [color = grey]) = 0))
+  if((([pcolor] of patch-here) = [145 196 255]) and (([infection] of current-human) > 0) and ((count my-out-links with [color = red] + count my-out-links with [color = grey]) = 0))
   [
     ask hfs with [hf-id = hfid]
     [
@@ -1028,11 +1052,11 @@ end
 GRAPHICS-WINDOW
 348
 68
-356
-77
+1356
+1077
 -1
 -1
-0.0
+1.0
 1
 10
 1
@@ -1366,6 +1390,23 @@ locked-cells
 17
 1
 11
+
+BUTTON
+93
+203
+156
+236
+NIL
+go
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?

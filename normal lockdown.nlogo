@@ -49,6 +49,8 @@ end
 to go
   clear-output
   tick
+  set weekday ((floor (ticks / oneday)) mod 7) + 1
+  set weekcount (floor (ticks / oneweek))
 
   ask humans [
     if(color != grey)
@@ -64,26 +66,27 @@ to go
     ]
   ]
 
-  ask hfs [
-    set hf-infected-count 0
-    if any? my-in-links [
-      set hf-infected-count (count my-in-links)
-    ]
+  ; compute growth factors and lockdown cells at the end of weekday 7
+  if ((weekday = 7) and (((((ticks + 1) / oneday)) mod 7) = 0)) [
 
-    ; calculate growth factor by last week new infected/this week new infected
-    ; if last week new infected = 0 then growth factor is 1
-    if (weekday = 1 and new-count-weekly-reset)
-    [
+    ask hfs [
+      set hf-infected-count 0
+      if any? my-in-links [
+        set hf-infected-count (count my-in-links)
+      ]
+
+      ; calculate growth factor by last week new infected/this week new infected
+      ; if last week new infected = 0 then growth factor is 1
       (ifelse (last-week-new-infected = 0)
-      [
-        (ifelse (count my-in-links with [color = red] > 0)
         [
-          set local-growth-factor 1
+          (ifelse (count my-in-links with [color = red] > 0)
+            [
+              set local-growth-factor 1
+            ][
+              set local-growth-factor 0
+          ])
         ][
-          set local-growth-factor 0
-        ])
-      ][
-        set local-growth-factor ((count my-in-links with [color = red]) / last-week-new-infected)
+          set local-growth-factor ((count my-in-links with [color = red]) / last-week-new-infected)
       ])
 
       if(with-lockdown)[
@@ -98,34 +101,26 @@ to go
       set last-week-new-infected (count my-in-links with [color = red])
       ask my-in-links with [color = red] [set color 5]
     ]
-  ]
 
-  (ifelse
-    (weekday = 1 and new-count-weekly-reset)
-    [
-      let last-infected 0
-      ask hfs [
-       set last-infected (last-infected + last-week-new-infected)
-      ]
-      (ifelse(last-week-infected = 0)[
-        set growth-factor 1
-      ][
-        set growth-factor (last-infected / last-week-infected)
-;        if (growth-factor > 1) [set growth-factor 1]
-      ])
-      set last-week-infected last-infected
-      set new-count-weekly-reset false
-    ](weekday = 7)[
-      set new-count-weekly-reset true
+    ; compute global growth factor
+    let last-infected 0
+    ask hfs [
+      set last-infected (last-infected + last-week-new-infected)
     ]
-  )
+    (ifelse(last-week-infected = 0)[
+      set growth-factor 1
+    ][
+      set growth-factor (last-infected / last-week-infected)
+    ])
+    set last-week-infected last-infected
+
+
+;    show "executed"
+  ]
 
 
 
 ;  show weekday
-
-  set weekday ((floor (ticks / oneday)) mod 7) + 1
-  set weekcount (floor (ticks / oneweek))
 end
 ;-------------------------------------------------------------------------------------------
 
