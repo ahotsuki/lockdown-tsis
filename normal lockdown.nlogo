@@ -32,6 +32,7 @@ to setup
 
   set cell-dimension ((max-pxcor + 1) / cell)
   set oneday (2 * (cell-dimension / 2))
+;  set oneday 1
   set oneweek (7 * oneday)
   set locked-cells []
 
@@ -146,7 +147,8 @@ to POPULATE
     set immunity ((oneday * 5) + (oneday * (((10 - immunity) / 10) * 5))) ;set immunity to recovery-limit in ticks (5 days + 5 * immunity% days)
 
     PREVENT-BLOCK-SPAWN
-    let isNormal DETECT-INFECTION
+
+    if ([pcolor] of patch-here = red) [ set color blue ]
   ]
 
 ;  ask n-of (population * 0.1) humans [set infection 1]
@@ -287,12 +289,15 @@ to FORWARD-WITHOUT-COLLISION
 end
 
 to-report DETECT-INFECTION
+  ; increase infection by 1 if infection is greater than 0 and less than a week
+  if (infection > 0) and (infection < (oneday * 7)) [set infection (infection + 1)]
+
+  ; set infection when infected
+  if (color = blue and infection = 0) [set infection 1]
+
   ; set infection to 1 when stepping on a red patch
   if (infection = 0) and (([pcolor] of patch-here) = red)
-  [
-    set infection 1
-    if(color != yellow) [ set color blue]
-  ]
+  [if(color != yellow) [ set color blue]]
 
   ; if not infected
   if(infection = 0)
@@ -309,10 +314,7 @@ to-report DETECT-INFECTION
 
     ; if humans nearby are infected and randomized number is less than transmission-rate, set this human as infected
     if(with-infection-here = true) and (random 100 <= transmission-rate)
-    [
-      set infection 1
-      if(color != yellow) [ set color blue]
-    ]
+    [if(color != yellow) [ set color blue]]
   ]
 
   ; if infection value exceeds 7 days (a week) then show symptoms of this human
@@ -321,9 +323,6 @@ to-report DETECT-INFECTION
     if color != yellow [set color yellow]
     report false
   ]
-
-  ; increase infection by 1 if infection is greater than 0 and less than a week
-  if (infection > 0) and (infection < (oneday * 7)) [set infection (infection + 1)]
 
   report true
 end
