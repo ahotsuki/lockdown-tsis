@@ -295,6 +295,7 @@ to POPULATE
     set UI INITIALIZE-LIST cell 0 true
 
     PREVENT-BLOCK-SPAWN
+    let isNormal DETECT-INFECTION
 
     set current-cell ([pid] of patch-here)
     set cell-list (fput current-cell cell-list)
@@ -662,7 +663,10 @@ end
 to-report DETECT-INFECTION
   ; set infection to 1 when stepping on a red patch
   if (infection = 0) and (([pcolor] of patch-here) = red)
-  [set infection 1]
+  [
+    set infection 1
+    if(color != yellow) [ set color blue]
+  ]
 
   ; if not infected
   if(infection = 0)
@@ -1052,11 +1056,11 @@ end
 GRAPHICS-WINDOW
 348
 68
-1356
-1077
+806
+527
 -1
 -1
-1.0
+50.0
 1
 10
 1
@@ -1067,9 +1071,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-999
+8
 0
-999
+8
 1
 1
 1
@@ -1119,7 +1123,7 @@ cell
 cell
 1
 10
-10.0
+3.0
 1
 1
 NIL
@@ -1131,7 +1135,7 @@ INPUTBOX
 250
 70
 population
-1000.0
+5.0
 1
 0
 Number
@@ -1157,7 +1161,7 @@ INPUTBOX
 341
 70
 infection-radius
-50.0
+1.0
 1
 0
 Number
@@ -1326,7 +1330,7 @@ INPUTBOX
 342
 369
 hfs-radius
-25.0
+0.0
 1
 0
 Number
